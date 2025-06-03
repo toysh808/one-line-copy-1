@@ -1,13 +1,17 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@/types';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
-  updateUser: (updates: Partial<User>) => void;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ error?: any }>;
+  signup: (email: string, password: string, username?: string) => Promise<{ error?: any }>;
+  signInWithGoogle: () => Promise<{ error?: any }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: any }>;
+  updateUser: (updates: { username?: string }) => Promise<{ error?: any }>;
   isLoading: boolean;
 }
 
@@ -23,73 +27,161 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('oneline_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+
+        // Handle email confirmation
+        if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
+          console.log('User email confirmed, signed in successfully');
+        }
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (email === 'demo@oneline.com' && password === 'demo123') {
-      const user: User = {
-        id: 'demo_user',
-        username: 'demo_user',
-        email: email
-      };
-      setUser(user);
-      localStorage.setItem('oneline_user', JSON.stringify(user));
-    } else {
-      throw new Error('Invalid credentials');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setIsLoading(false);
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      setIsLoading(false);
+      return { error };
     }
-    
-    setIsLoading(false);
   };
 
-  const signup = async (username: string, email: string, password: string): Promise<void> => {
+  const signup = async (email: string, password: string, username?: string) => {
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user: User = {
-      id: `user_${Date.now()}`,
-      username,
-      email
-    };
-    
-    setUser(user);
-    localStorage.setItem('oneline_user', JSON.stringify(user));
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: username ? { username } : undefined,
+        },
+      });
+
+      setIsLoading(false);
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      setIsLoading(false);
+      return { error };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        setIsLoading(false);
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      setIsLoading(false);
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    setIsLoading(true);
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      setUser(null);
+      setSession(null);
+    }
     setIsLoading(false);
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('oneline_user');
+  const resetPassword = async (email: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/reset-password`;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      return { error };
+    } catch (error) {
+      return { error };
+    }
   };
 
-  const updateUser = (updates: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      localStorage.setItem('oneline_user', JSON.stringify(updatedUser));
+  const updateUser = async (updates: { username?: string }) => {
+    try {
+      if (!user) return { error: new Error('No user logged in') };
+
+      // Update profile in profiles table
+      if (updates.username) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ username: updates.username })
+          .eq('id', user.id);
+
+        if (profileError) {
+          return { error: profileError };
+        }
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error };
     }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
+      session,
       login,
       signup,
-      logout,
+      signInWithGoogle,
+      signOut,
+      resetPassword,
       updateUser,
       isLoading
     }}>

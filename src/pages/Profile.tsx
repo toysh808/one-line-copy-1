@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,12 +11,14 @@ import { useNavigate } from 'react-router-dom';
 import { Line } from '@/types';
 import { generateMockLines } from '@/utils/mockData';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Profile = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
-  const [editUsername, setEditUsername] = useState(user?.username || '');
+  const [editUsername, setEditUsername] = useState('');
+  const [currentUsername, setCurrentUsername] = useState('');
   const [myLines, setMyLines] = useState<Line[]>([]);
   const [bookmarkedLines, setBookmarkedLines] = useState<Line[]>([]);
 
@@ -26,6 +28,9 @@ const Profile = () => {
       return;
     }
 
+    // Fetch user profile
+    fetchUserProfile();
+    
     // Load user's lines and bookmarks
     const allLines = generateMockLines();
     const userLines = allLines.filter(line => line.authorId === user.id).slice(0, 5);
@@ -35,18 +40,52 @@ const Profile = () => {
     setBookmarkedLines(bookmarks);
   }, [user, navigate]);
 
+  const fetchUserProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+
+      if (data) {
+        setCurrentUsername(data.username || '');
+        setEditUsername(data.username || '');
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
   if (!user) {
     return null;
   }
 
-  const handleSaveUsername = () => {
+  const handleSaveUsername = async () => {
     if (editUsername.trim()) {
-      updateUser({ username: editUsername.trim() });
-      setIsEditing(false);
-      toast({
-        title: "Profile updated",
-        description: "Your username has been changed successfully."
-      });
+      const { error } = await updateUser({ username: editUsername.trim() });
+      
+      if (error) {
+        toast({
+          title: "Update failed",
+          description: error.message || "Failed to update username",
+          variant: "destructive"
+        });
+      } else {
+        setCurrentUsername(editUsername.trim());
+        setIsEditing(false);
+        toast({
+          title: "Profile updated",
+          description: "Your username has been changed successfully."
+        });
+      }
     }
   };
 
@@ -65,14 +104,23 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/')}
-          className="mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Feed
-        </Button>
+        <div className="flex items-center justify-between mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Feed
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/settings')}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </div>
 
         <Card className="mb-6">
           <CardHeader>
@@ -96,7 +144,7 @@ const Profile = () => {
                       variant="outline" 
                       onClick={() => {
                         setIsEditing(false);
-                        setEditUsername(user.username);
+                        setEditUsername(currentUsername);
                       }}
                       size="sm"
                     >
@@ -105,7 +153,7 @@ const Profile = () => {
                   </>
                 ) : (
                   <>
-                    <Input value={`@${user.username}`} readOnly />
+                    <Input value={currentUsername ? `@${currentUsername}` : 'Loading...'} readOnly />
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -120,7 +168,12 @@ const Profile = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
-              <Input value={user.email} readOnly className="bg-muted" />
+              <Input value={user.email || ''} readOnly className="bg-muted" />
+              {user.email_confirmed_at ? (
+                <p className="text-sm text-green-600">✓ Email verified</p>
+              ) : (
+                <p className="text-sm text-orange-600">⚠ Email not verified</p>
+              )}
             </div>
           </CardContent>
         </Card>

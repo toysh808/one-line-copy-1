@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
 const Settings = () => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -20,8 +20,8 @@ const Settings = () => {
     }
   }, [user, navigate]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     navigate('/');
     toast({
       title: "Signed out",
@@ -38,11 +38,11 @@ const Settings = () => {
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         <Button 
           variant="ghost" 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/profile')}
           className="mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Feed
+          Back to Profile
         </Button>
 
         <div className="space-y-6">
@@ -81,8 +81,12 @@ const Settings = () => {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Signed in as</p>
-                  <p className="font-medium">@{user.username}</p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                  <p className="font-medium">{user.email}</p>
+                  {user.email_confirmed_at ? (
+                    <p className="text-sm text-green-600">Email verified</p>
+                  ) : (
+                    <p className="text-sm text-orange-600">Email not verified</p>
+                  )}
                 </div>
                 
                 <Button 
