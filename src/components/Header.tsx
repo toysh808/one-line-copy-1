@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, PenTool, User } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,18 +14,9 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onLinePosted }) => {
   const { user } = useAuth();
-  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const handleCompose = () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setIsComposeOpen(true);
-  };
 
   const handleSearch = () => {
     setIsSearchOpen(true);
@@ -51,18 +42,6 @@ export const Header: React.FC<HeaderProps> = ({ onLinePosted }) => {
             <Button variant="ghost" size="icon" onClick={handleSearch} className="h-10 w-10">
               <Search className="h-5 w-5" />
             </Button>
-            
-            {!isMobile && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleCompose}
-                className="gap-2"
-              >
-                <PenTool className="h-4 w-4" />
-                Write
-              </Button>
-            )}
             
             <Button variant="ghost" size="icon" onClick={handleProfile} className="h-10 w-10">
               <User className="h-5 w-5" />

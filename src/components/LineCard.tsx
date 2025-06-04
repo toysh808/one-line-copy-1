@@ -96,7 +96,7 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                     variant="ghost"
                     size="sm"
                     onClick={handleLike}
-                    className={`h-8 px-2 ${line.isLiked ? 'text-red-500' : 'text-muted-foreground'} hover:text-red-500`}
+                    className={`h-8 px-2 ${line.isLiked ? 'text-blue-500' : 'text-muted-foreground'} hover:text-blue-500`}
                   >
                     <ArrowUp className={`h-4 w-4 mr-1 ${line.isLiked ? 'fill-current' : ''}`} />
                     {line.likes}

@@ -76,7 +76,7 @@ export const LineOfTheDay: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleLike}
-                      className={`text-white hover:bg-white/10 ${line.isLiked ? 'text-red-300' : ''}`}
+                      className={`text-white hover:bg-white/10 ${line.isLiked ? 'text-blue-300' : ''}`}
                     >
                       <ArrowUp className={`h-4 w-4 mr-1 ${line.isLiked ? 'fill-current' : ''}`} />
                       {line.likes}
