@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,7 +28,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         .from('lines')
         .select(`
           *,
-          profiles!lines_author_id_fkey(username),
+          profiles(username),
           likes(user_id),
           bookmarks(user_id)
         `)
@@ -48,7 +47,10 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase query error:', error);
+        throw error;
+      }
 
       // Transform the data to match our Line interface
       const transformedLines: Line[] = (data || []).map(line => ({
