@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { LineOfTheDay } from '@/components/LineOfTheDay';
@@ -8,6 +8,7 @@ import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { ComposeModal } from '@/components/ComposeModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { seedMockData } from '@/utils/seedData';
 
 const Index = () => {
   const { user } = useAuth();
@@ -15,8 +16,20 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [dataSeeded, setDataSeeded] = useState(false);
   
   const dateFilter = searchParams.get('date');
+
+  useEffect(() => {
+    // Seed mock data on first load
+    const initializeMockData = async () => {
+      if (!dataSeeded) {
+        await seedMockData();
+        setDataSeeded(true);
+      }
+    };
+    initializeMockData();
+  }, [dataSeeded]);
 
   const handleCompose = () => {
     if (!user) {

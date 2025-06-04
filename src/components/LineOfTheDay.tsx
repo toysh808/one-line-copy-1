@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowUp, Bookmark, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,11 +7,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useAuth } from '@/contexts/AuthContext';
 import { getLineOfTheDay } from '@/utils/mockData';
 import { toast } from '@/hooks/use-toast';
+import { Line } from '@/types';
 
 export const LineOfTheDay: React.FC = () => {
   const { user } = useAuth();
-  const [line, setLine] = useState(() => getLineOfTheDay());
+  const [line, setLine] = useState<Line | null>(null);
   const [showTimestamp, setShowTimestamp] = useState(false);
+
+  useEffect(() => {
+    const loadLineOfTheDay = async () => {
+      const lotd = await getLineOfTheDay();
+      setLine(lotd);
+    };
+    loadLineOfTheDay();
+  }, []);
 
   const handleLike = () => {
     if (!user) {
@@ -23,11 +32,13 @@ export const LineOfTheDay: React.FC = () => {
       return;
     }
     
-    setLine(prev => ({
-      ...prev,
-      isLiked: !prev.isLiked,
-      likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
-    }));
+    if (line) {
+      setLine(prev => prev ? {
+        ...prev,
+        isLiked: !prev.isLiked,
+        likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
+      } : null);
+    }
   };
 
   const handleBookmark = () => {
@@ -40,16 +51,32 @@ export const LineOfTheDay: React.FC = () => {
       return;
     }
     
-    setLine(prev => ({
-      ...prev,
-      isBookmarked: !prev.isBookmarked
-    }));
-    
-    toast({
-      title: line.isBookmarked ? "Bookmark removed" : "Bookmarked!",
-      description: line.isBookmarked ? "Line removed from bookmarks" : "Line saved to bookmarks"
-    });
+    if (line) {
+      setLine(prev => prev ? {
+        ...prev,
+        isBookmarked: !prev.isBookmarked
+      } : null);
+      
+      toast({
+        title: line.isBookmarked ? "Bookmark removed" : "Bookmarked!",
+        description: line.isBookmarked ? "Line removed from bookmarks" : "Line saved to bookmarks"
+      });
+    }
   };
+
+  if (!line) {
+    return (
+      <Card className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-fade-in">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Crown className="h-5 w-5 text-yellow-300" />
+            <span className="text-sm font-medium text-white/90">Line of the Day</span>
+          </div>
+          <p className="text-lg">Loading today's most liked line...</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -93,7 +120,7 @@ export const LineOfTheDay: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleBookmark}
-                      className={`text-white hover:bg-white/10 ${line.isBookmarked ? 'text-yellow-300' : ''}`}
+                      className={`text-white hover:bg-white/10 ${line.isBookmarked ? 'text-amber-300' : ''}`}
                     >
                       <Bookmark className={`h-4 w-4 ${line.isBookmarked ? 'fill-current' : ''}`} />
                     </Button>

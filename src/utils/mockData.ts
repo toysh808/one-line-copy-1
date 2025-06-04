@@ -1,5 +1,6 @@
 
 import { Line } from '@/types';
+import { getLineOfTheDayFromDB } from './seedData';
 
 const SAMPLE_TEXTS = [
   "The best time to plant a tree was 20 years ago. The second best time is now.",
@@ -62,7 +63,15 @@ export const generateMockLines = (): Line[] => {
   return lines.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 };
 
-export const getLineOfTheDay = (): Line => {
+export const getLineOfTheDay = async (): Promise<Line> => {
+  // Try to get the actual line of the day from the database
+  const lineFromDB = await getLineOfTheDayFromDB();
+  
+  if (lineFromDB) {
+    return lineFromDB;
+  }
+
+  // Fallback to static line if database is empty
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 

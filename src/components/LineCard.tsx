@@ -113,7 +113,7 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                     variant="ghost"
                     size="sm"
                     onClick={handleBookmark}
-                    className={`h-8 w-8 p-0 ${line.isBookmarked ? 'text-yellow-500' : 'text-muted-foreground'} hover:text-yellow-500`}
+                    className={`h-8 w-8 p-0 ${line.isBookmarked ? 'text-amber-500' : 'text-muted-foreground'} hover:text-amber-500`}
                   >
                     <Bookmark className={`h-4 w-4 ${line.isBookmarked ? 'fill-current' : ''}`} />
                   </Button>
