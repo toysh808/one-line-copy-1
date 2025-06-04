@@ -6,13 +6,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ComposeModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  onLinePosted?: () => void;
 }
 
-export const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, onOpenChange }) => {
+export const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, onOpenChange, onLinePosted }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const [text, setText] = useState('');
@@ -41,17 +43,38 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, onOpenChange
 
     setIsPosting(true);
     
-    // Simulate posting
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Line posted!",
-      description: "Your thought has been shared with the world."
-    });
-    
-    setIsPosting(false);
-    onOpenChange(false);
-    setText('');
+    try {
+      const { error } = await supabase
+        .from('lines')
+        .insert({
+          text: text.trim(),
+          author_id: user.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Line posted!",
+        description: "Your thought has been shared with the world."
+      });
+      
+      onOpenChange(false);
+      setText('');
+      
+      // Notify parent component to refresh the feed
+      if (onLinePosted) {
+        onLinePosted();
+      }
+    } catch (error) {
+      console.error('Error posting line:', error);
+      toast({
+        title: "Error posting line",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (

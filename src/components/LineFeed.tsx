@@ -3,48 +3,111 @@ import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Line } from '@/types';
-import { generateMockLines } from '@/utils/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LineFeedProps {
   dateFilter?: string;
+  refreshTrigger?: number;
 }
 
-export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter }) => {
+export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }) => {
+  const { user } = useAuth();
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     loadLines();
-  }, [dateFilter]);
+  }, [dateFilter, refreshTrigger]);
 
   const loadLines = async () => {
     setIsLoading(true);
     
-    // Simulate API loading
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    let allLines = generateMockLines();
-    
-    if (dateFilter) {
-      const filterDate = new Date(dateFilter);
-      const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
-      
-      allLines = allLines.filter(line => 
-        line.timestamp >= startOfDay && line.timestamp <= endOfDay
-      );
+    try {
+      let query = supabase
+        .from('lines')
+        .select(`
+          *,
+          profiles!lines_author_id_fkey(username),
+          likes(user_id),
+          bookmarks(user_id)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter);
+        const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999)).toISOString();
+        
+        query = query
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Transform the data to match our Line interface
+      const transformedLines: Line[] = (data || []).map(line => ({
+        id: line.id,
+        text: line.text,
+        author: line.profiles?.username || 'Unknown',
+        authorId: line.author_id,
+        likes: line.likes_count || 0,
+        timestamp: new Date(line.created_at),
+        isLiked: user ? line.likes.some((like: any) => like.user_id === user.id) : false,
+        isBookmarked: user ? line.bookmarks.some((bookmark: any) => bookmark.user_id === user.id) : false
+      }));
+
+      setLines(transformedLines);
+      setHasMore(transformedLines.length >= 20);
+    } catch (error) {
+      console.error('Error loading lines:', error);
+      setLines([]);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setLines(allLines);
-    setIsLoading(false);
-    setHasMore(allLines.length >= 20);
   };
 
-  const handleLineUpdate = (updatedLine: Line) => {
-    setLines(prev => prev.map(line => 
-      line.id === updatedLine.id ? updatedLine : line
-    ));
+  const handleLineUpdate = async (updatedLine: Line) => {
+    if (!user) return;
+
+    try {
+      if (updatedLine.isLiked !== lines.find(l => l.id === updatedLine.id)?.isLiked) {
+        if (updatedLine.isLiked) {
+          await supabase.from('likes').insert({
+            line_id: updatedLine.id,
+            user_id: user.id
+          });
+        } else {
+          await supabase.from('likes').delete()
+            .eq('line_id', updatedLine.id)
+            .eq('user_id', user.id);
+        }
+      }
+
+      if (updatedLine.isBookmarked !== lines.find(l => l.id === updatedLine.id)?.isBookmarked) {
+        if (updatedLine.isBookmarked) {
+          await supabase.from('bookmarks').insert({
+            line_id: updatedLine.id,
+            user_id: user.id
+          });
+        } else {
+          await supabase.from('bookmarks').delete()
+            .eq('line_id', updatedLine.id)
+            .eq('user_id', user.id);
+        }
+      }
+
+      setLines(prev => prev.map(line => 
+        line.id === updatedLine.id ? updatedLine : line
+      ));
+    } catch (error) {
+      console.error('Error updating line interaction:', error);
+    }
   };
 
   if (isLoading) {

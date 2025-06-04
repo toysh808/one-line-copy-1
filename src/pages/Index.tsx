@@ -14,6 +14,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const dateFilter = searchParams.get('date');
 
@@ -25,19 +26,30 @@ const Index = () => {
     setIsComposeOpen(true);
   };
 
+  const handleLinePosted = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header onLinePosted={handleLinePosted} />
       
       <main className="container mx-auto px-4 py-6 max-w-2xl">
         <div className="space-y-6">
           {!dateFilter && <LineOfTheDay />}
-          <LineFeed dateFilter={dateFilter || undefined} />
+          <LineFeed 
+            dateFilter={dateFilter || undefined} 
+            refreshTrigger={refreshTrigger}
+          />
         </div>
       </main>
 
       <FloatingActionButton onClick={handleCompose} />
-      <ComposeModal isOpen={isComposeOpen} onOpenChange={setIsComposeOpen} />
+      <ComposeModal 
+        isOpen={isComposeOpen} 
+        onOpenChange={setIsComposeOpen}
+        onLinePosted={handleLinePosted}
+      />
     </div>
   );
 };
