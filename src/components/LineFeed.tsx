@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +29,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         .from('lines')
         .select(`
           *,
-          profiles(username),
+          profiles!lines_author_id_fkey(username),
           likes(user_id),
           bookmarks(user_id)
         `)
