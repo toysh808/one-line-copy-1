@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,7 +28,6 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         .from('lines')
         .select(`
           *,
-          profiles!lines_author_id_fkey(username),
           likes(user_id),
           bookmarks(user_id)
         `)
@@ -46,18 +44,33 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
           .lte('created_at', endOfDay);
       }
 
-      const { data, error } = await query;
+      const { data: linesData, error } = await query;
 
       if (error) {
         console.error('Supabase query error:', error);
         throw error;
       }
 
+      // Fetch profile data separately to avoid relationship issues
+      const authorIds = [...new Set(linesData?.map(line => line.author_id) || [])];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', authorIds);
+
+      if (profilesError) {
+        console.error('Profiles query error:', profilesError);
+        throw profilesError;
+      }
+
+      // Create a map of author IDs to usernames
+      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile.username]) || []);
+
       // Transform the data to match our Line interface
-      const transformedLines: Line[] = (data || []).map(line => ({
+      const transformedLines: Line[] = (linesData || []).map(line => ({
         id: line.id,
         text: line.text,
-        author: line.profiles?.username || 'Unknown',
+        author: profilesMap.get(line.author_id) || 'Unknown',
         authorId: line.author_id,
         likes: line.likes_count || 0,
         timestamp: new Date(line.created_at),
