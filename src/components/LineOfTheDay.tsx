@@ -22,7 +22,9 @@ export const LineOfTheDay: React.FC = () => {
     loadLineOfTheDay();
   }, []);
 
-  const handleLike = () => {
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -39,9 +41,14 @@ export const LineOfTheDay: React.FC = () => {
         likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
       } : null);
     }
+    
+    // Remove focus after action
+    (e.target as HTMLElement).blur();
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -62,6 +69,13 @@ export const LineOfTheDay: React.FC = () => {
         description: line.isBookmarked ? "Line removed from bookmarks" : "Line saved to bookmarks"
       });
     }
+    
+    // Remove focus after action
+    (e.target as HTMLElement).blur();
+  };
+
+  const handleCardClick = () => {
+    setShowTimestamp(!showTimestamp);
   };
 
   if (!line) {
@@ -80,9 +94,11 @@ export const LineOfTheDay: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <Card className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-fade-in">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 hover:bg-white/50 transition-colors cursor-pointer"
-             onClick={() => setShowTimestamp(!showTimestamp)} />
+      <Card 
+        className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 text-white animate-fade-in cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 hover:bg-white/50 transition-colors z-10" />
         
         <div className="p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -96,7 +112,7 @@ export const LineOfTheDay: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/80">@{line.author}</span>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -106,7 +122,6 @@ export const LineOfTheDay: React.FC = () => {
                       className={`text-white hover:bg-white/10 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
                         line.isLiked ? 'bg-white/20' : ''
                       }`}
-                      onBlur={(e) => e.target.blur()}
                     >
                       <ArrowUp className={`h-4 w-4 mr-1 transition-all duration-200 ${
                         line.isLiked ? 'fill-current stroke-2' : 'stroke-2'
@@ -128,7 +143,6 @@ export const LineOfTheDay: React.FC = () => {
                       className={`text-white hover:bg-white/10 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
                         line.isBookmarked ? 'bg-white/20' : ''
                       }`}
-                      onBlur={(e) => e.target.blur()}
                     >
                       <Bookmark className={`h-4 w-4 transition-all duration-200 ${
                         line.isBookmarked ? 'fill-current' : ''

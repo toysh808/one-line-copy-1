@@ -18,7 +18,9 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
   const [line, setLine] = useState(initialLine);
   const [showTimestamp, setShowTimestamp] = useState(false);
 
-  const handleLike = () => {
+  const handleLike = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -36,9 +38,14 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
     
     setLine(updatedLine);
     onUpdate(updatedLine);
+    
+    // Remove focus after action
+    (e.target as HTMLElement).blur();
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -60,6 +67,13 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
       title: line.isBookmarked ? "Bookmark removed" : "Bookmarked!",
       description: line.isBookmarked ? "Line removed from bookmarks" : "Line saved to bookmarks"
     });
+    
+    // Remove focus after action
+    (e.target as HTMLElement).blur();
+  };
+
+  const handleCardClick = () => {
+    setShowTimestamp(!showTimestamp);
   };
 
   const timeAgo = (date: Date) => {
@@ -73,11 +87,11 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
 
   return (
     <TooltipProvider>
-      <Card className="relative p-4 hover:shadow-md transition-shadow animate-fade-in">
-        <div 
-          className="absolute left-0 top-0 bottom-0 w-1 bg-border hover:bg-primary/50 transition-colors cursor-pointer z-10"
-          onClick={() => setShowTimestamp(!showTimestamp)}
-        />
+      <Card 
+        className="relative p-4 hover:shadow-md transition-shadow animate-fade-in cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-border hover:bg-primary/50 transition-colors z-10" />
         
         <div className="space-y-3">
           <p className="text-base leading-relaxed">{line.text}</p>
@@ -89,7 +103,7 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
               <span>{timeAgo(line.timestamp)}</span>
             </div>
             
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -101,7 +115,6 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                         ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
                         : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'
                     }`}
-                    onBlur={(e) => e.target.blur()}
                   >
                     <ArrowUp className={`h-4 w-4 mr-1 transition-all duration-200 ${
                       line.isLiked ? 'fill-current stroke-2' : 'stroke-2'
@@ -125,7 +138,6 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                         ? 'text-orange-500 bg-orange-50 hover:bg-orange-100' 
                         : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
                     }`}
-                    onBlur={(e) => e.target.blur()}
                   >
                     <Bookmark className={`h-4 w-4 transition-all duration-200 ${
                       line.isBookmarked ? 'fill-current' : ''
