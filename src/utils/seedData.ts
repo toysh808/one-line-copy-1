@@ -154,19 +154,32 @@ const REALISTIC_LINES = [
   }
 ];
 
+// Generate UUIDs for consistent users
+const generateConsistentUUIDs = () => {
+  const uuids = [];
+  const base = '00000000-0000-4000-8000-000000000';
+  for (let i = 0; i < REALISTIC_LINES.length; i++) {
+    const paddedIndex = i.toString().padStart(3, '0');
+    uuids.push(`${base}${paddedIndex}`);
+  }
+  return uuids;
+};
+
 export const seedMockData = async () => {
   try {
+    const userUUIDs = generateConsistentUUIDs();
+    
     // Create profiles for mock users
     const profiles = REALISTIC_LINES.map((line, index) => ({
-      id: `user_${index + 1}`,
+      id: userUUIDs[index],
       username: line.username,
       is_premium: Math.random() > 0.8
     }));
 
-    // Insert profiles
+    // Insert profiles (ignore duplicates)
     const { error: profilesError } = await supabase
       .from('profiles')
-      .insert(profiles);
+      .upsert(profiles, { onConflict: 'id' });
 
     if (profilesError && !profilesError.message.includes('duplicate key')) {
       console.error('Error inserting profiles:', profilesError);
@@ -183,71 +196,77 @@ export const seedMockData = async () => {
       );
 
       return {
-        id: `line_${index + 1}`,
         text: line.text,
-        author_id: `user_${index + 1}`,
+        author_id: userUUIDs[index],
         likes_count: line.likes,
         created_at: randomTime.toISOString(),
         theme: 'Default'
       };
     });
 
-    // Insert lines
-    const { error: linesError } = await supabase
+    // Insert lines (ignore duplicates)
+    const { data: insertedLines, error: linesError } = await supabase
       .from('lines')
-      .insert(lines);
+      .upsert(lines, { onConflict: 'text,author_id' })
+      .select('id, text, author_id');
 
     if (linesError && !linesError.message.includes('duplicate key')) {
       console.error('Error inserting lines:', linesError);
       return;
     }
 
-    // Create realistic likes data
-    const likes = [];
-    for (let i = 0; i < REALISTIC_LINES.length; i++) {
-      const lineId = `line_${i + 1}`;
-      const likesCount = REALISTIC_LINES[i].likes;
+    // Create realistic likes data if we have inserted lines
+    if (insertedLines && insertedLines.length > 0) {
+      const likes = [];
       
-      // Create likes from different users
-      for (let j = 0; j < Math.min(likesCount, 50); j++) {
-        const randomUserIndex = Math.floor(Math.random() * profiles.length);
-        likes.push({
-          line_id: lineId,
-          user_id: `user_${randomUserIndex + 1}`
+      for (const line of insertedLines) {
+        const originalLineIndex = REALISTIC_LINES.findIndex(rl => rl.text === line.text);
+        if (originalLineIndex === -1) continue;
+        
+        const likesCount = REALISTIC_LINES[originalLineIndex].likes;
+        
+        // Create likes from different users (up to 50 per line to avoid overwhelming the database)
+        const maxLikes = Math.min(likesCount, 50);
+        for (let j = 0; j < maxLikes; j++) {
+          const randomUserIndex = Math.floor(Math.random() * userUUIDs.length);
+          likes.push({
+            line_id: line.id,
+            user_id: userUUIDs[randomUserIndex]
+          });
+        }
+      }
+
+      // Insert likes in batches to avoid overwhelming the database
+      const batchSize = 100;
+      for (let i = 0; i < likes.length; i += batchSize) {
+        const batch = likes.slice(i, i + batchSize);
+        const { error: likesError } = await supabase
+          .from('likes')
+          .upsert(batch, { onConflict: 'line_id,user_id' });
+
+        if (likesError && !likesError.message.includes('duplicate key')) {
+          console.error('Error inserting likes batch:', likesError);
+        }
+      }
+
+      // Create some bookmarks
+      const bookmarks = [];
+      for (let i = 0; i < 30; i++) {
+        const randomLineIndex = Math.floor(Math.random() * insertedLines.length);
+        const randomUserIndex = Math.floor(Math.random() * userUUIDs.length);
+        bookmarks.push({
+          line_id: insertedLines[randomLineIndex].id,
+          user_id: userUUIDs[randomUserIndex]
         });
       }
-    }
 
-    // Insert likes (in batches to avoid overwhelming the database)
-    const batchSize = 100;
-    for (let i = 0; i < likes.length; i += batchSize) {
-      const batch = likes.slice(i, i + batchSize);
-      const { error: likesError } = await supabase
-        .from('likes')
-        .insert(batch);
+      const { error: bookmarksError } = await supabase
+        .from('bookmarks')
+        .upsert(bookmarks, { onConflict: 'line_id,user_id' });
 
-      if (likesError && !likesError.message.includes('duplicate key')) {
-        console.error('Error inserting likes batch:', likesError);
+      if (bookmarksError && !bookmarksError.message.includes('duplicate key')) {
+        console.error('Error inserting bookmarks:', bookmarksError);
       }
-    }
-
-    // Create some bookmarks
-    const bookmarks = [];
-    for (let i = 0; i < 20; i++) {
-      const randomLineIndex = Math.floor(Math.random() * REALISTIC_LINES.length);
-      const randomUserIndex = Math.floor(Math.random() * profiles.length);
-      bookmarks.push({
-        line_id: `line_${randomLineIndex + 1}`,
-        user_id: `user_${randomUserIndex + 1}`
-      });
-    }
-
-    const { error: bookmarksError } = await supabase
-      .from('bookmarks')
-      .insert(bookmarks);
-
-    if (bookmarksError && !bookmarksError.message.includes('duplicate key')) {
-      console.error('Error inserting bookmarks:', bookmarksError);
     }
 
     console.log('Mock data seeded successfully!');

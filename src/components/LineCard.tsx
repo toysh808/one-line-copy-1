@@ -96,9 +96,16 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                     variant="ghost"
                     size="sm"
                     onClick={handleLike}
-                    className={`h-8 px-2 ${line.isLiked ? 'text-blue-500' : 'text-muted-foreground'} hover:text-blue-500`}
+                    className={`h-8 px-2 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
+                      line.isLiked 
+                        ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
+                        : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50'
+                    }`}
+                    onBlur={(e) => e.target.blur()}
                   >
-                    <ArrowUp className={`h-4 w-4 mr-1 ${line.isLiked ? 'fill-current' : ''}`} />
+                    <ArrowUp className={`h-4 w-4 mr-1 transition-all duration-200 ${
+                      line.isLiked ? 'fill-current stroke-2' : 'stroke-2'
+                    }`} />
                     {line.likes}
                   </Button>
                 </TooltipTrigger>
@@ -113,9 +120,16 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
                     variant="ghost"
                     size="sm"
                     onClick={handleBookmark}
-                    className={`h-8 w-8 p-0 ${line.isBookmarked ? 'text-amber-500' : 'text-muted-foreground'} hover:text-amber-500`}
+                    className={`h-8 w-8 p-0 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
+                      line.isBookmarked 
+                        ? 'text-orange-500 bg-orange-50 hover:bg-orange-100' 
+                        : 'text-muted-foreground hover:text-orange-500 hover:bg-orange-50'
+                    }`}
+                    onBlur={(e) => e.target.blur()}
                   >
-                    <Bookmark className={`h-4 w-4 ${line.isBookmarked ? 'fill-current' : ''}`} />
+                    <Bookmark className={`h-4 w-4 transition-all duration-200 ${
+                      line.isBookmarked ? 'fill-current' : ''
+                    }`} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>

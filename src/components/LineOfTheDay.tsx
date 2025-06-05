@@ -103,9 +103,14 @@ export const LineOfTheDay: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleLike}
-                      className={`text-white hover:bg-white/10 ${line.isLiked ? 'text-blue-300' : ''}`}
+                      className={`text-white hover:bg-white/10 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
+                        line.isLiked ? 'bg-white/20' : ''
+                      }`}
+                      onBlur={(e) => e.target.blur()}
                     >
-                      <ArrowUp className={`h-4 w-4 mr-1 ${line.isLiked ? 'fill-current' : ''}`} />
+                      <ArrowUp className={`h-4 w-4 mr-1 transition-all duration-200 ${
+                        line.isLiked ? 'fill-current stroke-2' : 'stroke-2'
+                      }`} />
                       {line.likes}
                     </Button>
                   </TooltipTrigger>
@@ -120,9 +125,14 @@ export const LineOfTheDay: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={handleBookmark}
-                      className={`text-white hover:bg-white/10 ${line.isBookmarked ? 'text-amber-300' : ''}`}
+                      className={`text-white hover:bg-white/10 rounded-full transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 active:scale-95 ${
+                        line.isBookmarked ? 'bg-white/20' : ''
+                      }`}
+                      onBlur={(e) => e.target.blur()}
                     >
-                      <Bookmark className={`h-4 w-4 ${line.isBookmarked ? 'fill-current' : ''}`} />
+                      <Bookmark className={`h-4 w-4 transition-all duration-200 ${
+                        line.isBookmarked ? 'fill-current' : ''
+                      }`} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
