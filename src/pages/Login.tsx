@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +25,7 @@ const Login = () => {
   const [signUpUsername, setSignUpUsername] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
   // Reset password form
   const [resetEmail, setResetEmail] = useState('');
@@ -49,6 +51,16 @@ const Login = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!agreeToTerms) {
+      toast({
+        title: "Agreement required",
+        description: "Please agree to the Terms of Service and Privacy Policy to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const { error } = await signup(signUpEmail, signUpPassword, signUpUsername);
     
     if (error) {
@@ -264,7 +276,35 @@ const Login = () => {
                         required
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    
+                    <div className="flex items-start space-x-2">
+                      <Checkbox 
+                        id="terms"
+                        checked={agreeToTerms}
+                        onCheckedChange={setAgreeToTerms}
+                        className="mt-1"
+                      />
+                      <Label htmlFor="terms" className="text-sm leading-5">
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/terms')}
+                          className="text-primary hover:underline"
+                        >
+                          Terms of Service
+                        </button>
+                        {' '}and{' '}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/privacy')}
+                          className="text-primary hover:underline"
+                        >
+                          Privacy Policy
+                        </button>
+                      </Label>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={isLoading || !agreeToTerms}>
                       {isLoading ? 'Creating account...' : 'Sign Up'}
                     </Button>
                   </form>
