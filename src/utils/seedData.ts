@@ -1,71 +1,91 @@
 
+import { Line } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
-export const getLineOfTheDayFromDB = async () => {
+export const getLineOfTheDayFromDB = async (): Promise<Line | null> => {
   try {
-    // Get the line with the most likes from the last 24 hours
+    // Get the most liked line from yesterday (or any recent day if no lines from yesterday)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    const endOfYesterday = new Date(yesterday);
+    endOfYesterday.setHours(23, 59, 59, 999);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('lines')
-      .select('*')
-      .gte('created_at', yesterday.toISOString())
+      .select(`
+        *,
+        likes(user_id),
+        bookmarks(user_id)
+      `)
       .order('likes_count', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (error || !data) {
-      // Fallback to highest liked line overall if no lines in last 24h
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('lines')
-        .select('*')
-        .order('likes_count', { ascending: false })
-        .limit(1)
-        .single();
+    // First try to get lines from yesterday
+    const { data: yesterdayLines, error: yesterdayError } = await query
+      .gte('created_at', yesterday.toISOString())
+      .lte('created_at', endOfYesterday.toISOString());
 
-      if (fallbackError || !fallbackData) {
-        return null;
-      }
-
-      // Get the profile for the fallback line
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', fallbackData.author_id)
-        .single();
-
-      return {
-        id: fallbackData.id,
-        text: fallbackData.text,
-        author: profileData?.username || 'Unknown',
-        authorId: fallbackData.author_id,
-        likes: fallbackData.likes_count || 0,
-        timestamp: new Date(fallbackData.created_at),
-        isLiked: false,
-        isBookmarked: false
-      };
+    if (yesterdayError) {
+      console.error('Error fetching yesterday lines:', yesterdayError);
     }
 
-    // Get the profile for the main line
-    const { data: profileData } = await supabase
+    let selectedLine = yesterdayLines?.[0];
+
+    // If no lines from yesterday, get the most liked line from the last week
+    if (!selectedLine) {
+      const lastWeek = new Date();
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      const { data: weekLines, error: weekError } = await supabase
+        .from('lines')
+        .select(`
+          *,
+          likes(user_id),
+          bookmarks(user_id)
+        `)
+        .gte('created_at', lastWeek.toISOString())
+        .order('likes_count', { ascending: false })
+        .limit(1);
+
+      if (weekError) {
+        console.error('Error fetching week lines:', weekError);
+      }
+
+      selectedLine = weekLines?.[0];
+    }
+
+    if (!selectedLine) {
+      return null;
+    }
+
+    // Get the author's profile
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('username')
-      .eq('id', data.author_id)
+      .eq('id', selectedLine.author_id)
       .single();
 
-    return {
-      id: data.id,
-      text: data.text,
+    if (profileError) {
+      console.error('Error fetching author profile:', profileError);
+    }
+
+    // Transform to Line interface
+    const transformedLine: Line = {
+      id: selectedLine.id,
+      text: selectedLine.text,
       author: profileData?.username || 'Unknown',
-      authorId: data.author_id,
-      likes: data.likes_count || 0,
-      timestamp: new Date(data.created_at),
-      isLiked: false,
-      isBookmarked: false
+      authorId: selectedLine.author_id,
+      likes: selectedLine.likes_count || 0,
+      timestamp: new Date(selectedLine.created_at),
+      isLiked: false, // Will be updated based on current user
+      isBookmarked: false // Will be updated based on current user
     };
+
+    return transformedLine;
   } catch (error) {
-    console.error('Error fetching line of the day:', error);
+    console.error('Error fetching line of the day from DB:', error);
     return null;
   }
 };

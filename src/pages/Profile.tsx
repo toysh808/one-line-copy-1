@@ -9,7 +9,6 @@ import { LineCard } from '@/components/LineCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Line } from '@/types';
-import { generateMockLines } from '@/utils/mockData';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -21,6 +20,7 @@ const Profile = () => {
   const [currentUsername, setCurrentUsername] = useState('');
   const [myLines, setMyLines] = useState<Line[]>([]);
   const [bookmarkedLines, setBookmarkedLines] = useState<Line[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
@@ -28,16 +28,9 @@ const Profile = () => {
       return;
     }
 
-    // Fetch user profile
     fetchUserProfile();
-    
-    // Load user's lines and bookmarks
-    const allLines = generateMockLines();
-    const userLines = allLines.filter(line => line.authorId === user.id).slice(0, 5);
-    const bookmarks = allLines.filter(line => line.isBookmarked).slice(0, 3);
-    
-    setMyLines(userLines);
-    setBookmarkedLines(bookmarks);
+    loadUserLines();
+    loadBookmarkedLines();
   }, [user, navigate]);
 
   const fetchUserProfile = async () => {
@@ -61,6 +54,107 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    }
+  };
+
+  const loadUserLines = async () => {
+    if (!user) return;
+
+    try {
+      const { data: linesData, error } = await supabase
+        .from('lines')
+        .select(`
+          *,
+          likes(user_id),
+          bookmarks(user_id)
+        `)
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading user lines:', error);
+        return;
+      }
+
+      if (linesData) {
+        // Get profile data for the author (which is the current user)
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+
+        const transformedLines: Line[] = linesData.map(line => ({
+          id: line.id,
+          text: line.text,
+          author: profileData?.username || 'Unknown',
+          authorId: line.author_id,
+          likes: line.likes_count || 0,
+          timestamp: new Date(line.created_at),
+          isLiked: line.likes.some((like: any) => like.user_id === user.id),
+          isBookmarked: line.bookmarks.some((bookmark: any) => bookmark.user_id === user.id)
+        }));
+
+        setMyLines(transformedLines);
+      }
+    } catch (error) {
+      console.error('Error loading user lines:', error);
+    }
+  };
+
+  const loadBookmarkedLines = async () => {
+    if (!user) return;
+
+    try {
+      const { data: bookmarksData, error } = await supabase
+        .from('bookmarks')
+        .select(`
+          line_id,
+          lines(
+            *,
+            likes(user_id),
+            bookmarks(user_id)
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error loading bookmarked lines:', error);
+        return;
+      }
+
+      if (bookmarksData) {
+        // Get all author IDs from the bookmarked lines
+        const authorIds = [...new Set(bookmarksData.map((bookmark: any) => bookmark.lines.author_id))];
+        
+        // Fetch profile data for all authors
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', authorIds);
+
+        const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile.username]) || []);
+
+        const transformedLines: Line[] = bookmarksData.map((bookmark: any) => {
+          const line = bookmark.lines;
+          return {
+            id: line.id,
+            text: line.text,
+            author: profilesMap.get(line.author_id) || 'Unknown',
+            authorId: line.author_id,
+            likes: line.likes_count || 0,
+            timestamp: new Date(line.created_at),
+            isLiked: line.likes.some((like: any) => like.user_id === user.id),
+            isBookmarked: true // All these lines are bookmarked
+          };
+        });
+
+        setBookmarkedLines(transformedLines);
+      }
+    } catch (error) {
+      console.error('Error loading bookmarked lines:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,17 +183,67 @@ const Profile = () => {
     }
   };
 
-  const handleLineUpdate = (updatedLine: Line, isMine: boolean) => {
-    if (isMine) {
+  const handleLineUpdate = async (updatedLine: Line) => {
+    if (!user) return;
+
+    try {
+      // Handle like/unlike
+      const originalLine = [...myLines, ...bookmarkedLines].find(l => l.id === updatedLine.id);
+      if (originalLine && updatedLine.isLiked !== originalLine.isLiked) {
+        if (updatedLine.isLiked) {
+          await supabase.from('likes').insert({
+            line_id: updatedLine.id,
+            user_id: user.id
+          });
+        } else {
+          await supabase.from('likes').delete()
+            .eq('line_id', updatedLine.id)
+            .eq('user_id', user.id);
+        }
+      }
+
+      // Handle bookmark/unbookmark
+      if (originalLine && updatedLine.isBookmarked !== originalLine.isBookmarked) {
+        if (updatedLine.isBookmarked) {
+          await supabase.from('bookmarks').insert({
+            line_id: updatedLine.id,
+            user_id: user.id
+          });
+        } else {
+          await supabase.from('bookmarks').delete()
+            .eq('line_id', updatedLine.id)
+            .eq('user_id', user.id);
+        }
+      }
+
+      // Update local state
       setMyLines(prev => prev.map(line => 
         line.id === updatedLine.id ? updatedLine : line
       ));
-    } else {
-      setBookmarkedLines(prev => prev.map(line => 
-        line.id === updatedLine.id ? updatedLine : line
-      ));
+      
+      setBookmarkedLines(prev => {
+        if (!updatedLine.isBookmarked) {
+          // Remove from bookmarked lines if unbookmarked
+          return prev.filter(line => line.id !== updatedLine.id);
+        }
+        return prev.map(line => 
+          line.id === updatedLine.id ? updatedLine : line
+        );
+      });
+    } catch (error) {
+      console.error('Error updating line interaction:', error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-6 max-w-2xl">
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,7 +334,7 @@ const Profile = () => {
                 <LineCard 
                   key={line.id} 
                   line={line} 
-                  onUpdate={(updatedLine) => handleLineUpdate(updatedLine, true)}
+                  onUpdate={handleLineUpdate}
                 />
               ))
             ) : (
@@ -209,7 +353,7 @@ const Profile = () => {
                 <LineCard 
                   key={line.id} 
                   line={line} 
-                  onUpdate={(updatedLine) => handleLineUpdate(updatedLine, false)}
+                  onUpdate={handleLineUpdate}
                 />
               ))
             ) : (
