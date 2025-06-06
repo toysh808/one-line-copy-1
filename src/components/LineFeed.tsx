@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,8 +52,16 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         throw error;
       }
 
+      // Only proceed if we have real data from the database
+      if (!linesData || linesData.length === 0) {
+        setLines([]);
+        setHasMore(false);
+        setIsLoading(false);
+        return;
+      }
+
       // Fetch profile data separately to avoid relationship issues
-      const authorIds = [...new Set(linesData?.map(line => line.author_id) || [])];
+      const authorIds = [...new Set(linesData.map(line => line.author_id))];
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username')
@@ -67,7 +76,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
       const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile.username]) || []);
 
       // Transform the data to match our Line interface
-      const transformedLines: Line[] = (linesData || []).map(line => ({
+      const transformedLines: Line[] = linesData.map(line => ({
         id: line.id,
         text: line.text,
         author: profilesMap.get(line.author_id) || 'Unknown',
@@ -152,7 +161,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         <p className="text-muted-foreground text-lg">
           {dateFilter 
             ? `No lines found for ${new Date(dateFilter).toLocaleDateString()}`
-            : "No lines found"
+            : "No lines found. Be the first to share a line!"
           }
         </p>
         {dateFilter && (
