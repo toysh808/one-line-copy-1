@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ComposeModal } from './ComposeModal';
 import { SearchModal } from './SearchModal';
+import { OneLogo } from './OneLogo';
 import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
@@ -30,12 +31,19 @@ export const Header: React.FC<HeaderProps> = ({ onLinePosted }) => {
     navigate('/profile');
   };
 
+  const handleHomeClick = () => {
+    navigate('/');
+  };
+
   return (
     <>
       <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
-            OneLine
+          <button 
+            onClick={handleHomeClick} 
+            className="hover:opacity-80 transition-opacity"
+          >
+            <OneLogo />
           </button>
           
           <div className="flex items-center gap-2">

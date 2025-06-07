@@ -20,7 +20,7 @@ const Profile = () => {
   const [currentUsername, setCurrentUsername] = useState('');
   const [myLines, setMyLines] = useState<Line[]>([]);
   const [bookmarkedLines, setBookmarkedLines] = useState<Line[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (!user) {
@@ -28,10 +28,27 @@ const Profile = () => {
       return;
     }
 
-    fetchUserProfile();
-    loadUserLines();
-    loadBookmarkedLines();
+    // Load data immediately without showing loading state
+    loadProfileData();
   }, [user, navigate]);
+
+  const loadProfileData = async () => {
+    if (!user) return;
+
+    try {
+      // Load all data in parallel for better performance
+      const [profileData, userLinesData, bookmarksData] = await Promise.all([
+        fetchUserProfile(),
+        loadUserLines(),
+        loadBookmarkedLines()
+      ]);
+      
+      setIsInitialLoad(false);
+    } catch (error) {
+      console.error('Error loading profile data:', error);
+      setIsInitialLoad(false);
+    }
+  };
 
   const fetchUserProfile = async () => {
     if (!user) return;
@@ -153,8 +170,6 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error loading bookmarked lines:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -234,16 +249,6 @@ const Profile = () => {
       console.error('Error updating line interaction:', error);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-6 max-w-2xl">
-          <p>Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
