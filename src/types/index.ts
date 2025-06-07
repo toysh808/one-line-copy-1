@@ -15,3 +15,12 @@ export interface User {
   username: string;
   email: string;
 }
+
+export interface UserReview {
+  id: string;
+  name: string;
+  date: string;
+  lines: string;
+  votes: number;
+  created_at: string;
+}

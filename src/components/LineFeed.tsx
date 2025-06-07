@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { LineCard } from './LineCard';
+import { ReviewCard } from './ReviewCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Line } from '@/types';
+import { Line, UserReview } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,16 +15,37 @@ interface LineFeedProps {
 export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }) => {
   const { user } = useAuth();
   const [lines, setLines] = useState<Line[]>([]);
+  const [reviews, setReviews] = useState<UserReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
-    loadLines();
+    loadContent();
   }, [dateFilter, refreshTrigger]);
 
-  const loadLines = async () => {
+  const loadContent = async () => {
     setIsLoading(true);
     
+    try {
+      // Load lines
+      await loadLines();
+      
+      // Load reviews (only when no date filter is applied)
+      if (!dateFilter) {
+        await loadReviews();
+      } else {
+        setReviews([]);
+      }
+    } catch (error) {
+      console.error('Error loading content:', error);
+      setLines([]);
+      setReviews([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadLines = async () => {
     try {
       let query = supabase
         .from('lines')
@@ -33,7 +55,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
           bookmarks(user_id)
         `)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(15);
 
       if (dateFilter) {
         const filterDate = new Date(dateFilter);
@@ -52,11 +74,9 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         throw error;
       }
 
-      // Only proceed if we have real data from the database
       if (!linesData || linesData.length === 0) {
         setLines([]);
         setHasMore(false);
-        setIsLoading(false);
         return;
       }
 
@@ -88,12 +108,30 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
       }));
 
       setLines(transformedLines);
-      setHasMore(transformedLines.length >= 20);
+      setHasMore(transformedLines.length >= 15);
     } catch (error) {
       console.error('Error loading lines:', error);
       setLines([]);
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const loadReviews = async () => {
+    try {
+      const { data: reviewsData, error } = await supabase
+        .from('user_reviews')
+        .select('*')
+        .order('votes', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error('Reviews query error:', error);
+        throw error;
+      }
+
+      setReviews(reviewsData || []);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+      setReviews([]);
     }
   };
 
@@ -155,13 +193,19 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
     );
   }
 
-  if (lines.length === 0) {
+  // Combine and sort content by creation date
+  const allContent = [
+    ...lines.map(line => ({ type: 'line' as const, content: line, sortDate: line.timestamp })),
+    ...reviews.map(review => ({ type: 'review' as const, content: review, sortDate: new Date(review.created_at) }))
+  ].sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+
+  if (allContent.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground text-lg">
           {dateFilter 
             ? `No lines found for ${new Date(dateFilter).toLocaleDateString()}`
-            : "No lines found. Be the first to share a line!"
+            : "No content found. Be the first to share a line!"
           }
         </p>
         {dateFilter && (
@@ -188,17 +232,22 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         </div>
       )}
       
-      {lines.map((line) => (
-        <LineCard 
-          key={line.id} 
-          line={line} 
-          onUpdate={handleLineUpdate}
-        />
+      {allContent.map((item, index) => (
+        <div key={`${item.type}-${item.content.id}-${index}`}>
+          {item.type === 'line' ? (
+            <LineCard 
+              line={item.content as Line} 
+              onUpdate={handleLineUpdate}
+            />
+          ) : (
+            <ReviewCard review={item.content as UserReview} />
+          )}
+        </div>
       ))}
       
-      {hasMore && (
+      {hasMore && !dateFilter && (
         <div className="text-center py-4">
-          <p className="text-sm text-muted-foreground">Loading more lines...</p>
+          <p className="text-sm text-muted-foreground">Loading more content...</p>
         </div>
       )}
     </div>
