@@ -85,6 +85,12 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
     return `${Math.floor(diffInMinutes / 1440)}d`;
   };
 
+  const isOlderThan7Days = (date: Date) => {
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return diffInDays > 7;
+  };
+
   return (
     <TooltipProvider>
       <Card 
@@ -99,8 +105,12 @@ export const LineCard: React.FC<LineCardProps> = ({ line: initialLine, onUpdate 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <span>@{line.author}</span>
-              <span>·</span>
-              <span>{timeAgo(line.timestamp)}</span>
+              {!isOlderThan7Days(line.timestamp) && (
+                <>
+                  <span>·</span>
+                  <span>{timeAgo(line.timestamp)}</span>
+                </>
+              )}
             </div>
             
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
