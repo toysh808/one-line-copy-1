@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { Line } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,16 +16,30 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
   const { user } = useAuth();
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+
+  const LINES_PER_PAGE = 15;
 
   useEffect(() => {
-    loadLines();
+    // Reset state when dateFilter or refreshTrigger changes
+    setLines([]);
+    setOffset(0);
+    setHasMore(true);
+    loadLines(true);
   }, [dateFilter, refreshTrigger]);
 
-  const loadLines = async () => {
-    setIsLoading(true);
+  const loadLines = async (isInitialLoad = false) => {
+    if (isInitialLoad) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     
     try {
+      const currentOffset = isInitialLoad ? 0 : offset;
+      
       let query = supabase
         .from('lines')
         .select(`
@@ -33,7 +48,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
           bookmarks(user_id)
         `)
         .order('created_at', { ascending: false })
-        .limit(15);
+        .range(currentOffset, currentOffset + LINES_PER_PAGE - 1);
 
       if (dateFilter) {
         const filterDate = new Date(dateFilter);
@@ -53,7 +68,9 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
       }
 
       if (!linesData || linesData.length === 0) {
-        setLines([]);
+        if (isInitialLoad) {
+          setLines([]);
+        }
         setHasMore(false);
         return;
       }
@@ -85,15 +102,35 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         isBookmarked: user ? line.bookmarks.some((bookmark: any) => bookmark.user_id === user.id) : false
       }));
 
-      setLines(transformedLines);
-      setHasMore(transformedLines.length >= 15);
+      if (isInitialLoad) {
+        setLines(transformedLines);
+        setOffset(LINES_PER_PAGE);
+      } else {
+        setLines(prev => [...prev, ...transformedLines]);
+        setOffset(prev => prev + LINES_PER_PAGE);
+      }
+      
+      // Check if we have more content
+      setHasMore(transformedLines.length === LINES_PER_PAGE);
     } catch (error) {
       console.error('Error loading lines:', error);
-      setLines([]);
+      if (isInitialLoad) {
+        setLines([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
+
+  const handleLoadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore && !dateFilter) {
+      loadLines(false);
+    }
+  }, [isLoadingMore, hasMore, dateFilter, offset]);
 
   const handleLineUpdate = async (updatedLine: Line) => {
     if (!user) return;
@@ -196,7 +233,20 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
       
       {hasMore && !dateFilter && (
         <div className="text-center py-4">
-          <p className="text-sm text-muted-foreground">Loading more content...</p>
+          <Button 
+            variant="outline" 
+            onClick={handleLoadMore}
+            disabled={isLoadingMore}
+            className="w-full"
+          >
+            {isLoadingMore ? "Loading..." : "Load More"}
+          </Button>
+        </div>
+      )}
+      
+      {!hasMore && lines.length > 0 && !dateFilter && (
+        <div className="text-center py-4">
+          <p className="text-sm text-muted-foreground">You've reached the end!</p>
         </div>
       )}
     </div>
