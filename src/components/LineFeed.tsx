@@ -25,6 +25,11 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
     setIsLoading(true);
     
     try {
+      // Calculate 7 days ago from now
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
       let query = supabase
         .from('lines')
         .select(`
@@ -33,7 +38,8 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
           bookmarks(user_id)
         `)
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(15)
+        .gte('created_at', sevenDaysAgo.toISOString()); // Only show lines from last 7 days
 
       if (dateFilter) {
         const filterDate = new Date(dateFilter);
@@ -159,7 +165,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         <p className="text-muted-foreground text-lg">
           {dateFilter 
             ? `No lines found for ${new Date(dateFilter).toLocaleDateString()}`
-            : "No lines found. Be the first to share a line!"
+            : "No lines found from the last 7 days. Be the first to share a line!"
           }
         </p>
         {dateFilter && (
