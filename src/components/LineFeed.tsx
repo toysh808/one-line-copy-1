@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LineCard } from './LineCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { Line } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +18,7 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const LINES_PER_PAGE = 15;
 
@@ -29,6 +29,28 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
     setHasMore(true);
     loadLines(true);
   }, [dateFilter, refreshTrigger]);
+
+  // Intersection Observer for infinite scrolling
+  useEffect(() => {
+    if (!loadMoreRef.current || dateFilter) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoading) {
+          loadLines(false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [hasMore, isLoadingMore, isLoading, dateFilter, offset]);
 
   const loadLines = async (isInitialLoad = false) => {
     if (isInitialLoad) {
@@ -125,12 +147,6 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
       }
     }
   };
-
-  const handleLoadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && !dateFilter) {
-      loadLines(false);
-    }
-  }, [isLoadingMore, hasMore, dateFilter, offset]);
 
   const handleLineUpdate = async (updatedLine: Line) => {
     if (!user) return;
@@ -231,22 +247,27 @@ export const LineFeed: React.FC<LineFeedProps> = ({ dateFilter, refreshTrigger }
         />
       ))}
       
-      {hasMore && !dateFilter && (
-        <div className="text-center py-4">
-          <Button 
-            variant="outline" 
-            onClick={handleLoadMore}
-            disabled={isLoadingMore}
-            className="w-full"
-          >
-            {isLoadingMore ? "Loading..." : "Load More"}
-          </Button>
-        </div>
-      )}
-      
-      {!hasMore && lines.length > 0 && !dateFilter && (
-        <div className="text-center py-4">
-          <p className="text-sm text-muted-foreground">You've reached the end!</p>
+      {/* Infinite scroll trigger - only for non-filtered feeds */}
+      {!dateFilter && (
+        <div ref={loadMoreRef} className="text-center py-4">
+          {isLoadingMore && (
+            <div className="space-y-3">
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Skeleton className="h-4 w-full animate-pulse-soft" />
+                <Skeleton className="h-4 w-3/4 animate-pulse-soft" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-3 w-20 animate-pulse-soft" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-6 w-12 animate-pulse-soft" />
+                    <Skeleton className="h-6 w-6 animate-pulse-soft" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {!hasMore && lines.length > 0 && (
+            <p className="text-sm text-muted-foreground">You've reached the end!</p>
+          )}
         </div>
       )}
     </div>
