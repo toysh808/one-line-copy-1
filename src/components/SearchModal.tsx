@@ -23,6 +23,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onOpenChange }
   };
 
   const maxDate = new Date().toISOString().split('T')[0];
+  const minDate = '2025-01-01';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -53,6 +54,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onOpenChange }
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
+                min={minDate}
                 max={maxDate}
                 className="pl-10"
               />
